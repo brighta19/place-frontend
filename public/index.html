@@ -10,18 +10,100 @@
             margin: 0;
             background: #444;
         }
-        #cvs-container {
+        #container {
             position: fixed;
-            top: 0;
+            top: 50%;
+            left: 50%;
+            image-rendering: pixelated;
+        }
+        .buttons {
+            position: fixed;
+            bottom: 30px;
             left: 0;
-            transform: translate(0, 0) scale(1);
+            width: 100%;
+            text-align: center;
+        }
+        .buttons button {
+            display: inline-block;
+            padding: 0;
+            border: 2px solid black;
+            border-radius: 5px;
+            overflow: hidden;
+            width: 40px;
+            height: 40px;
+            margin: 0 10px;
+            cursor: pointer;
+        }
+        .buttons button.active {
+            transform: scale(1.2);
+            box-shadow: 0 0 15px #fff;
         }
     </style>
     <script src="/build.js" defer></script>
 </head>
 <body>
-    <div id="cvs-container">
-        <canvas id="cvs"></canvas>
+    <div id="container" style="transform: translate(-50%, -50%) scale(1)"></div>
+    <div class="buttons">
+        <button data-color="0" class="active">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#fff"></rect>
+            </svg>
+        </button>
+        <button data-color="1">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#999"></rect>
+            </svg>
+        </button>
+        <button data-color="2">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#666"></rect>
+            </svg>
+        </button>
+        <button data-color="3">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#333"></rect>
+            </svg>
+        </button>
+        <button data-color="4">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#000"></rect>
+            </svg>
+        </button>
+        <button data-color="5">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#840"></rect>
+            </svg>
+        </button>
+        <button data-color="6">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#f00"></rect>
+            </svg>
+        </button>
+        <button data-color="7">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#f80"></rect>
+            </svg>
+        </button>
+        <button data-color="8">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#ff0"></rect>
+            </svg>
+        </button>
+        <button data-color="9">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#0f0"></rect>
+            </svg>
+        </button>
+        <button data-color="10">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#00f"></rect>
+            </svg>
+        </button>
+        <button data-color="11">
+            <svg width="40" height="40">
+                <rect x="0" y="0" width="40" height="40" fill="#f0f"></rect>
+            </svg>
+        </button>
     </div>
 </body>
 </html>
