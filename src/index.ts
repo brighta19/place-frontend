@@ -66,10 +66,10 @@ function start() {
 
     let container: HTMLDivElement | null = document.querySelector(`div#${CONTAINER_ELEM_ID}`);
     if (container == null) throw new Error("There is no div element with id " + CONTAINER_ELEM_ID);
-    container.onpointerdown = (e) => {
+    container.addEventListener("pointerdown", (e) => {
         createPointer(e);
-    };
-    container.onpointermove = (e) => {
+    });
+    container.addEventListener("pointermove", (e) => {
         updatePointer(e);
 
         if (pointers.length === 1) {
@@ -101,8 +101,8 @@ function start() {
             updateTransform(translateX, translateY, getClampedScale(scale * zoomDiff));
             wasZoomed = true;
         }
-    };
-    container.onpointerup = (e) => {
+    });
+    container.addEventListener("pointerup", (e) => {
         updatePointer(e);
 
         if (pointers.length === 1) {
@@ -118,13 +118,13 @@ function start() {
         }
 
         removePointer(e);
-    };
-    container.onwheel = (e) => {
+    });
+    container.addEventListener("wheel", (e) => {
         e.preventDefault();
 
         scale = getClampedScale(scale - e.deltaY / 50);
         updateTransform(translateX, translateY, scale);
-    };
+    }, { passive: true });
 
     cvs = document.createElement("canvas");
     cvs.width = width;
