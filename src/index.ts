@@ -7,12 +7,20 @@ const COLORS = [ "#fff", "#999", "#666", "#333", "#000", "#840", "#f00", "#f80",
 const ROWS = 80;
 const COLS = 100;
 const TILE_SIZE = 10;
+const DRAG_RANGE = 300;
 
 let ctx: CanvasRenderingContext2D;
 let selectedColor: number;
+let mouse = { startingX: 0, startingY: 0, down: false };
+let isDragging = false;
 
 function start() {
+    let width = COLS * TILE_SIZE;
+    let height = ROWS * TILE_SIZE;
+    let translateX = 0;
+    let translateY = 0;
     let buttonElems: HTMLButtonElement[] = [];
+
     for (let i = 0; i < COLORS.length; i++) {
         let selector = `button[data-color="${i}"]`;
         let _button: HTMLButtonElement | null = document.querySelector(selector)
@@ -36,22 +44,56 @@ function start() {
 
     let container: HTMLDivElement | null = document.querySelector(`div#${CONTAINER_ELEM_ID}`);
     if (container == null) throw new Error("There is no div element with id " + CONTAINER_ELEM_ID);
+    container.onpointerdown = (e) => {
+        if (e.button === 2) return;
+
+        mouse.startingX = e.clientX;
+        mouse.startingY = e.clientY;
+        mouse.down = true;
+    };
+    container.onpointermove = (e) => {
+        if (e.button === 2 || !mouse.down) return;
+
+        let x = e.clientX;
+        let y = e.clientY;
+        let diffX = x - mouse.startingX;
+        let diffY = y - mouse.startingY;
+
+        if (isDragging) {
+            cvs.style.transform = `translate(${translateX + diffX}px, ${translateY + diffY}px)`;
+        }
+        else {
+            let distance = Math.abs( diffX**2 + diffY**2 );
+            isDragging = distance >= DRAG_RANGE;
+        }
+    };
+    container.onpointerup = (e) => {
+        if (e.button === 2) return;
+
+        if (isDragging) {
+            translateX += e.clientX - mouse.startingX;
+            translateY += e.clientY - mouse.startingY;
+        }
+        else if (e.button === 0) {
+            let x = Math.floor((e.offsetX - cvs.offsetLeft) / TILE_SIZE);
+            let y = Math.floor((e.offsetY - cvs.offsetTop) / TILE_SIZE);
+
+            placeTile(x, y);
+            socket.emit("place-tile", [x, y, selectedColor]);
+            console.log(`Placed tile (x: ${x}, y: ${y})`);
+        }
+
+        mouse.down = false;
+        isDragging = false;
+    };
 
     let cvs: HTMLCanvasElement = document.createElement("canvas");
+    cvs.width = width;
+    cvs.height = height;
     cvs.style.background = "#fff";
-    cvs.width = COLS * TILE_SIZE;
-    cvs.height = ROWS * TILE_SIZE;
-    cvs.onclick = (e) => {
-        let x = e.offsetX - cvs.offsetLeft;
-        let y = e.offsetY - cvs.offsetTop;
-
-        x = Math.floor(x / TILE_SIZE);
-        y = Math.floor(y / TILE_SIZE);
-
-        console.log(`Placed tile (x: ${x}, y: ${y})`);
-        socket.emit("place-tile", [x, y, selectedColor]);
-        placeTile(x, y);
-    }
+    cvs.style.position = "absolute";
+    cvs.style.display = "block";
+    cvs.style.transform = `translate(${translateX}px, ${translateY}px) scale(1)`;
     container.appendChild(cvs);
 
     let _ctx = cvs.getContext("2d");
@@ -65,7 +107,7 @@ function start() {
     });
 
     socket.on("all-tiles", (tiles) => {
-        console.log(`Received tiles!`);
+        console.log(`Received ${tiles.length} tiles!`);
         ctx.fillStyle = "#fff";
         ctx.fillRect(0, 0, cvs.width, cvs.height)
         for (let tile of tiles) {
