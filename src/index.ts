@@ -8,6 +8,7 @@ const ROWS = 80;
 const COLS = 100;
 const TILE_SIZE = 10;
 const DRAG_RANGE = 300;
+const ZOOM_RANGE = [5, 30];
 
 let ctx: CanvasRenderingContext2D;
 let selectedColor: number;
@@ -19,6 +20,7 @@ function start() {
     let height = ROWS * TILE_SIZE;
     let translateX = 0;
     let translateY = 0;
+    let scale = 10;
     let buttonElems: HTMLButtonElement[] = [];
 
     for (let i = 0; i < COLORS.length; i++) {
@@ -60,7 +62,7 @@ function start() {
         let diffY = y - mouse.startingY;
 
         if (isDragging) {
-            cvs.style.transform = `translate(${translateX + diffX}px, ${translateY + diffY}px)`;
+            cvs.style.transform = `translate(${translateX + diffX}px, ${translateY + diffY}px) scale(${scale/10})`;
         }
         else {
             let distance = Math.abs( diffX**2 + diffY**2 );
@@ -87,13 +89,20 @@ function start() {
         isDragging = false;
     };
 
+    container.onwheel = (e: WheelEvent) => {
+        e.preventDefault();
+        scale -= e.deltaY / 50;
+        scale = Math.min(ZOOM_RANGE[1], Math.max(scale, ZOOM_RANGE[0])); // clamp to range
+        cvs.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale/10})`;
+    };
+
     let cvs: HTMLCanvasElement = document.createElement("canvas");
     cvs.width = width;
     cvs.height = height;
     cvs.style.background = "#fff";
     cvs.style.position = "absolute";
     cvs.style.display = "block";
-    cvs.style.transform = `translate(${translateX}px, ${translateY}px) scale(1)`;
+    cvs.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale/10})`;
     container.appendChild(cvs);
 
     let _ctx = cvs.getContext("2d");
