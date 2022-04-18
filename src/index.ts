@@ -1,3 +1,6 @@
+import { io } from "socket.io-client";
+
+const WEBSOCKET_URL = `ws://${location.hostname}:3000`;
 const CONTAINER_ELEM_ID = "container";
 const COLORS = [ "#fff", "#999", "#666", "#333", "#000", "#840", "#f00", "#f80", "#ff0", "#0f0", "#00f", "#f0f" ];
 const ROWS = 80;
@@ -5,8 +8,7 @@ const COLS = 100;
 const TILE_SIZE = 10;
 
 let ctx: CanvasRenderingContext2D;
-let data: number[][];
-let activeColor: number;
+let selectedColor: number;
 
 function start() {
     let buttonElems: HTMLButtonElement[] = [];
@@ -15,11 +17,11 @@ function start() {
         let _button: HTMLButtonElement | null = document.querySelector(selector)
         if (_button == null) throw new Error(`Could not find ${selector}`);
         _button.onclick = () => {
-            buttonElems[activeColor].classList.remove('active');
+            buttonElems[selectedColor].classList.remove('active');
             _button?.classList.add('active');
             let color = _button?.dataset.color;
             if (color === undefined) throw new Error("No data-color attribuite")
-            activeColor = Number(color);
+            selectedColor = Number(color);
         };
         buttonElems.push(_button);
     }
@@ -28,7 +30,7 @@ function start() {
     if (_activeColor == -1)
         buttonElems[0].click();
     else
-        activeColor = _activeColor;
+        selectedColor = _activeColor;
 
 
     let container: HTMLDivElement | null = document.querySelector(`div#${CONTAINER_ELEM_ID}`);
@@ -42,6 +44,11 @@ function start() {
         let x = e.offsetX - cvs.offsetLeft;
         let y = e.offsetY - cvs.offsetTop;
 
+        x = Math.floor(x / TILE_SIZE);
+        y = Math.floor(y / TILE_SIZE);
+
+        console.log(`Placed tile (x: ${x}, y: ${y})`);
+        socket.emit("place-tile", [x, y, selectedColor]);
         placeTile(x, y);
     }
     container.appendChild(cvs);
@@ -50,39 +57,31 @@ function start() {
     if (_ctx == null) throw new Error("The context for the canvas is not available");
     ctx = _ctx;
 
-    data = [
-        [ 7,  2,  1],
-        [ 7,  3,  1],
-        [ 7,  4,  1],
-        [ 7,  1,  2],
-        [ 7,  2,  2],
-        [ 8,  3,  2],
-        [ 8,  4,  2],
-        [ 7,  1,  3],
-        [ 7,  2,  3],
-        [ 7,  3,  3],
-        [ 7,  4,  3],
-        [ 7,  2,  4],
-        [ 7,  3,  4],
-        [ 7,  4,  4],
-        [ 7,  2,  5],
-        [ 7,  4,  5]
-    ];
+    const socket = io(WEBSOCKET_URL);
 
-    draw();
+    socket.on("connect", () => {
+        console.log("Connected!");
+    });
+
+    socket.on("all-tiles", (tiles) => {
+        console.log(`Received tiles!`);
+        console.log(tiles);
+        ctx.clearRect(0, 0, cvs.width, cvs.height)
+        for (let tile of tiles) {
+            let pos = tile[0].split(',')
+            placeTile(pos[0], pos[1], tile[1]);
+        }
+    })
+
+    socket.on("new-tile", (data) => {
+        let [x, y, color] = data;
+        console.log(`Received tile (x: ${x}, y: ${y})`);
+        placeTile(x, y, color);
+    });
 }
 
-function draw() {
-    for (let tileData of data) {
-        ctx.fillStyle = COLORS[tileData[0]];
-        ctx.fillRect(tileData[1] * TILE_SIZE, tileData[2] * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-    }
-}
-
-function placeTile(x: number, y: number) {
-    x = Math.floor(x / TILE_SIZE);
-    y = Math.floor(y / TILE_SIZE);
-    ctx.fillStyle = COLORS[activeColor];
+function placeTile(x: number, y: number, color?: number) {
+    ctx.fillStyle = COLORS[color || selectedColor];
     ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 }
 
