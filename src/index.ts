@@ -89,7 +89,7 @@ function start() {
         isDragging = false;
     };
 
-    container.onwheel = (e: WheelEvent) => {
+    container.onwheel = (e) => {
         e.preventDefault();
         scale -= e.deltaY / 50;
         scale = Math.min(ZOOM_RANGE[1], Math.max(scale, ZOOM_RANGE[0])); // clamp to range
@@ -102,6 +102,17 @@ function start() {
     cvs.style.background = "#fff";
     cvs.style.position = "absolute";
     cvs.style.display = "block";
+    if (width > height) {
+        if (width > window.innerWidth * 0.9)
+            scale = Math.floor(((window.innerWidth * 0.9) / width) * 10);
+    }
+    else {
+        if (height > window.innerHeight * 0.9)
+            scale = Math.floor(((window.innerHeight * 0.9) / height) * 10);
+    }
+    scale = Math.min(ZOOM_RANGE[1], Math.max(scale, ZOOM_RANGE[0])); // clamp to range
+    translateX = (window.innerWidth / 2) - (width / 2);
+    translateY = (window.innerHeight / 2) - (height / 2);
     cvs.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale/10})`;
     container.appendChild(cvs);
 
