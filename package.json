@@ -6,7 +6,7 @@
   "scripts": {
     "build": "webpack",
     "dev": "concurrently \"webpack --watch --mode development\" \"sirv public --dev\"",
-    "start": "sirv public"
+    "start": "sirv public --host"
   },
   "keywords": [],
   "author": "",

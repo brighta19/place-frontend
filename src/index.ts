@@ -1,6 +1,7 @@
 import { io } from "socket.io-client";
 
-const WEBSOCKET_URL = `ws://${location.hostname}:3000`;
+const WS_PORT = 3000;
+const WS_URL = `ws://${location.hostname}:${WS_PORT}`;
 const CONTAINER_ELEM_ID = "container";
 const COLORS = [ "#fff", "#999", "#666", "#333", "#000", "#840", "#f00", "#f80", "#ff0", "#0f0", "#00f", "#f0f" ];
 const ROWS = 80;
@@ -57,7 +58,7 @@ function start() {
     if (_ctx == null) throw new Error("The context for the canvas is not available");
     ctx = _ctx;
 
-    const socket = io(WEBSOCKET_URL);
+    const socket = io(WS_URL);
 
     socket.on("connect", () => {
         console.log("Connected!");
@@ -65,8 +66,8 @@ function start() {
 
     socket.on("all-tiles", (tiles) => {
         console.log(`Received tiles!`);
-        console.log(tiles);
-        ctx.clearRect(0, 0, cvs.width, cvs.height)
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, cvs.width, cvs.height)
         for (let tile of tiles) {
             let pos = tile[0].split(',')
             placeTile(pos[0], pos[1], tile[1]);
