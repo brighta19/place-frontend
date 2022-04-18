@@ -30,6 +30,7 @@ function start() {
     else
         activeColor = _activeColor;
 
+
     let container: HTMLDivElement | null = document.querySelector(`div#${CONTAINER_ELEM_ID}`);
     if (container == null) throw new Error("There is no div element with id " + CONTAINER_ELEM_ID);
 
@@ -37,6 +38,12 @@ function start() {
     cvs.style.background = "#fff";
     cvs.width = COLS * TILE_SIZE;
     cvs.height = ROWS * TILE_SIZE;
+    cvs.onclick = (e) => {
+        let x = e.offsetX - cvs.offsetLeft;
+        let y = e.offsetY - cvs.offsetTop;
+
+        placeTile(x, y);
+    }
     container.appendChild(cvs);
 
     let _ctx = cvs.getContext("2d");
@@ -44,19 +51,22 @@ function start() {
     ctx = _ctx;
 
     data = [
-        [ 0,  0,  0],
-        [ 1,  1,  1],
-        [ 2,  2,  2],
-        [ 3,  3,  3],
-        [ 4,  4,  4],
-        [ 5,  5,  5],
-        [ 6,  6,  6],
-        [ 7,  7,  7],
-        [ 8,  8,  8],
-        [ 9,  9,  9],
-        [10, 10, 10],
-        [11, 11, 11],
-        [12, 12, 12],
+        [ 7,  2,  1],
+        [ 7,  3,  1],
+        [ 7,  4,  1],
+        [ 7,  1,  2],
+        [ 7,  2,  2],
+        [ 8,  3,  2],
+        [ 8,  4,  2],
+        [ 7,  1,  3],
+        [ 7,  2,  3],
+        [ 7,  3,  3],
+        [ 7,  4,  3],
+        [ 7,  2,  4],
+        [ 7,  3,  4],
+        [ 7,  4,  4],
+        [ 7,  2,  5],
+        [ 7,  4,  5]
     ];
 
     draw();
@@ -67,6 +77,13 @@ function draw() {
         ctx.fillStyle = COLORS[tileData[0]];
         ctx.fillRect(tileData[1] * TILE_SIZE, tileData[2] * TILE_SIZE, TILE_SIZE, TILE_SIZE);
     }
+}
+
+function placeTile(x: number, y: number) {
+    x = Math.floor(x / TILE_SIZE);
+    y = Math.floor(y / TILE_SIZE);
+    ctx.fillStyle = COLORS[activeColor];
+    ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 }
 
 start();
