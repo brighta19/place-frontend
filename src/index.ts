@@ -124,7 +124,7 @@ function start() {
 
         scale = getClampedScale(scale - e.deltaY / 50);
         updateTransform(translateX, translateY, scale);
-    }, { passive: true });
+    }, { passive: false });
 
     cvs = document.createElement("canvas");
     cvs.width = width;
@@ -132,6 +132,7 @@ function start() {
     cvs.style.background = "#fff";
     cvs.style.position = "absolute";
     cvs.style.display = "block";
+    cvs.style.boxShadow = "0 0 20px #003";
     if (width > height) {
         if (width > window.innerWidth * 0.9)
             scale = getClampedScale(Math.floor((window.innerWidth * 0.9) / width) * 10);
