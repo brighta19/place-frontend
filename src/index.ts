@@ -1,6 +1,16 @@
 import { DefaultEventsMap } from "@socket.io/component-emitter";
 import { io, Socket } from "socket.io-client";
 
+type Pointer = {
+    id: number,
+    type: string,
+    button: number,
+    startingX: number,
+    startingY: number,
+    x: number,
+    y: number
+}
+
 const WS_PORT = 3000;
 const WS_URL = `ws://${location.hostname}:${WS_PORT}`;
 const CONTAINER_ELEM_ID = "container";
@@ -9,22 +19,21 @@ const ROWS = 80;
 const COLS = 100;
 const TILE_SIZE = 10;
 const DRAG_RANGE = 300;
-const ZOOM_RANGE = [5, 30];
+const ZOOM_RANGE = [2, 30];
 
 let cvs: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D;
 let socket: Socket<DefaultEventsMap, DefaultEventsMap>;
 let selectedColor: number;
-let pointer = {
-    startingX: 0,
-    startingY: 0,
-    x: 0,
-    y: 0,
-    down: false
-};
+let pointers: Pointer[] = [];
 let isDragging = false;
+let isZooming = false;
 let translateX = 0;
 let translateY = 0;
+let translateDiffX = 0;
+let translateDiffY = 0;
+let zoomStartingDistance = 0;
+let zoomDiff = 0;
 let scale = 10;
 
 function start() {
@@ -56,34 +65,46 @@ function start() {
     let container: HTMLDivElement | null = document.querySelector(`div#${CONTAINER_ELEM_ID}`);
     if (container == null) throw new Error("There is no div element with id " + CONTAINER_ELEM_ID);
     container.onpointerdown = (e) => {
-        updatePointer(e);
+        createPointer(e);
     };
     container.onpointermove = (e) => {
         updatePointer(e);
-        if (!pointer.down) return;
 
-        if (isDragging)
-            updateDragging();
-        else
-            checkIfDragging();
+        if (pointers.length === 1) { // Drag
+            if (isZooming)
+                stopZooming();
+            if (!isDragging)
+                startDragging();
+
+            updateDragValues();
+            updateTransform(translateX + translateDiffX, translateY + translateDiffY, scale);
+        }
+        else if (pointers.length === 2) { // Zoom
+            if (isDragging)
+                stopDragging();
+            if (!isZooming)
+                startZooming();
+
+            updateZoomValues();
+            updateTransform(translateX, translateY, getClampedScale(scale * zoomDiff));
+        }
     };
     container.onpointerup = (e) => {
         updatePointer(e);
-        if (pointer.down) return;
 
-        if (isDragging)
+        if (isDragging && pointers.length === 1)
             stopDragging();
-        else if (e.button === 0)
-            pointerPlaceTile(e);
+        else if (isZooming && pointers.length === 2)
+            stopZooming();
+
+        removePointer(e);
     };
     container.onwheel = (e) => {
         e.preventDefault();
 
-        updateScale(scale - e.deltaY / 50);
+        scale = getClampedScale(scale - e.deltaY / 50);
         updateTransform(translateX, translateY, scale);
     };
-
-    let cvs: HTMLCanvasElement = document.createElement("canvas");
 
     cvs = document.createElement("canvas");
     cvs.width = width;
@@ -93,11 +114,11 @@ function start() {
     cvs.style.display = "block";
     if (width > height) {
         if (width > window.innerWidth * 0.9)
-            updateScale(Math.floor((window.innerWidth * 0.9) / width) * 10);
+            scale = getClampedScale(Math.floor((window.innerWidth * 0.9) / width) * 10);
     }
     else {
         if (height > window.innerHeight * 0.9)
-            updateScale(Math.floor((window.innerHeight * 0.9) / height) * 10);
+            scale = getClampedScale(Math.floor((window.innerHeight * 0.9) / height) * 10);
     }
     translateX = (window.innerWidth / 2) - (width / 2);
     translateY = (window.innerHeight / 2) - (height / 2);
@@ -131,35 +152,50 @@ function start() {
     });
 }
 
-function checkIfDragging() {
-    let diffX = pointer.x - pointer.startingX;
-    let diffY = pointer.y - pointer.startingY;
-
-    let distance = Math.abs( diffX**2 + diffY**2 );
-    if (distance >= DRAG_RANGE)
-        startDragging();
-}
-
 function startDragging() {
-    pointer.startingX = pointer.x;
-    pointer.startingY = pointer.y;
     isDragging = true;
-}
-
-function updateDragging() {
-    let diffX = pointer.x - pointer.startingX;
-    let diffY = pointer.y - pointer.startingY;
-    updateTransform(translateX + diffX, translateY + diffY, scale);
+    pointers[0].startingX = pointers[0].x;
+    pointers[0].startingY = pointers[0].y;
+    console.log("start dragging");
 }
 
 function stopDragging() {
-    translateX += pointer.x - pointer.startingX;
-    translateY += pointer.y - pointer.startingY;
+    translateX += translateDiffX;
+    translateY += translateDiffY;
     isDragging = false;
+    console.log("stop dragging");
 }
 
-function updateScale(_scale: number) {
-    scale = Math.min(ZOOM_RANGE[1], Math.max(_scale, ZOOM_RANGE[0])); // clamp to range
+function updateDragValues() {
+    translateDiffX = pointers[0].x - pointers[0].startingX;
+    translateDiffY = pointers[0].y - pointers[0].startingY;
+}
+
+function startZooming() {
+    isZooming = true;
+    zoomStartingDistance = Math.abs(
+        (pointers[0].x - pointers[1].x)**2 +
+        (pointers[0].y - pointers[1].y)**2
+    );
+    console.log("start zooming");
+}
+
+function stopZooming() {
+    isZooming = false;
+    scale = getClampedScale(scale * zoomDiff);
+    console.log("stop zooming");
+}
+
+function updateZoomValues() {
+    let distance = Math.abs(
+        (pointers[0].x - pointers[1].x)**2 +
+        (pointers[0].y - pointers[1].y)**2
+    );
+    zoomDiff = distance / zoomStartingDistance;
+}
+
+function getClampedScale(_scale: number) {
+    return Math.min(ZOOM_RANGE[1], Math.max(_scale, ZOOM_RANGE[0]));
 }
 
 function updateTransform(x: number, y: number, scale: number) {
@@ -167,19 +203,29 @@ function updateTransform(x: number, y: number, scale: number) {
 }
 
 function updatePointer(e: PointerEvent) {
+    let pointer = pointers.find((p) => p.id === e.pointerId);
+    if (pointer === undefined) return;
+
     pointer.x = e.clientX;
     pointer.y = e.clientY;
+}
 
-    if (e.type === "pointerdown" && !pointer.down) {
-        if (e.button !== 2) {
-            pointer.down = true;
-            pointer.startingX = pointer.x;
-            pointer.startingY = pointer.y;
-        }
-    }
-    else if (e.type === "pointerup" && pointer.down) {
-        pointer.down = false;
-    }
+function createPointer(e: PointerEvent) {
+    pointers.push({
+        id: e.pointerId,
+        type: e.pointerType,
+        button: e.button,
+        startingX: e.clientX,
+        startingY: e.clientY,
+        x: e.clientX,
+        y: e.clientY
+    });
+}
+
+function removePointer(e: PointerEvent) {
+    let pointerIndex = pointers.findIndex((p) => p.id === e.pointerId);
+    if (pointerIndex !== -1)
+        pointers.splice(pointerIndex, 1);
 }
 
 function pointerPlaceTile(e: PointerEvent) {
