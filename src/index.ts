@@ -1,4 +1,5 @@
-import { io } from "socket.io-client";
+import { DefaultEventsMap } from "@socket.io/component-emitter";
+import { io, Socket } from "socket.io-client";
 
 const WS_PORT = 3000;
 const WS_URL = `ws://${location.hostname}:${WS_PORT}`;
@@ -10,17 +11,25 @@ const TILE_SIZE = 10;
 const DRAG_RANGE = 300;
 const ZOOM_RANGE = [5, 30];
 
+let cvs: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D;
+let socket: Socket<DefaultEventsMap, DefaultEventsMap>;
 let selectedColor: number;
-let mouse = { startingX: 0, startingY: 0, down: false };
+let pointer = {
+    startingX: 0,
+    startingY: 0,
+    x: 0,
+    y: 0,
+    down: false
+};
 let isDragging = false;
+let translateX = 0;
+let translateY = 0;
+let scale = 10;
 
 function start() {
     let width = COLS * TILE_SIZE;
     let height = ROWS * TILE_SIZE;
-    let translateX = 0;
-    let translateY = 0;
-    let scale = 10;
     let buttonElems: HTMLButtonElement[] = [];
 
     for (let i = 0; i < COLORS.length; i++) {
@@ -47,56 +56,36 @@ function start() {
     let container: HTMLDivElement | null = document.querySelector(`div#${CONTAINER_ELEM_ID}`);
     if (container == null) throw new Error("There is no div element with id " + CONTAINER_ELEM_ID);
     container.onpointerdown = (e) => {
-        if (e.button === 2) return;
-
-        mouse.startingX = e.clientX;
-        mouse.startingY = e.clientY;
-        mouse.down = true;
+        updatePointer(e);
     };
     container.onpointermove = (e) => {
-        if (e.button === 2 || !mouse.down) return;
+        updatePointer(e);
+        if (!pointer.down) return;
 
-        let x = e.clientX;
-        let y = e.clientY;
-        let diffX = x - mouse.startingX;
-        let diffY = y - mouse.startingY;
-
-        if (isDragging) {
-            cvs.style.transform = `translate(${translateX + diffX}px, ${translateY + diffY}px) scale(${scale/10})`;
-        }
-        else {
-            let distance = Math.abs( diffX**2 + diffY**2 );
-            isDragging = distance >= DRAG_RANGE;
-        }
+        if (isDragging)
+            updateDragging();
+        else
+            checkIfDragging();
     };
     container.onpointerup = (e) => {
-        if (e.button === 2) return;
+        updatePointer(e);
+        if (pointer.down) return;
 
-        if (isDragging) {
-            translateX += e.clientX - mouse.startingX;
-            translateY += e.clientY - mouse.startingY;
-        }
-        else if (e.button === 0) {
-            let x = Math.floor((e.offsetX - cvs.offsetLeft) / TILE_SIZE);
-            let y = Math.floor((e.offsetY - cvs.offsetTop) / TILE_SIZE);
-
-            placeTile(x, y);
-            socket.emit("place-tile", [x, y, selectedColor]);
-            console.log(`Placed tile (x: ${x}, y: ${y})`);
-        }
-
-        mouse.down = false;
-        isDragging = false;
+        if (isDragging)
+            stopDragging();
+        else if (e.button === 0)
+            pointerPlaceTile(e);
     };
-
     container.onwheel = (e) => {
         e.preventDefault();
-        scale -= e.deltaY / 50;
-        scale = Math.min(ZOOM_RANGE[1], Math.max(scale, ZOOM_RANGE[0])); // clamp to range
-        cvs.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale/10})`;
+
+        updateScale(scale - e.deltaY / 50);
+        updateTransform(translateX, translateY, scale);
     };
 
     let cvs: HTMLCanvasElement = document.createElement("canvas");
+
+    cvs = document.createElement("canvas");
     cvs.width = width;
     cvs.height = height;
     cvs.style.background = "#fff";
@@ -104,23 +93,22 @@ function start() {
     cvs.style.display = "block";
     if (width > height) {
         if (width > window.innerWidth * 0.9)
-            scale = Math.floor(((window.innerWidth * 0.9) / width) * 10);
+            updateScale(Math.floor((window.innerWidth * 0.9) / width) * 10);
     }
     else {
         if (height > window.innerHeight * 0.9)
-            scale = Math.floor(((window.innerHeight * 0.9) / height) * 10);
+            updateScale(Math.floor((window.innerHeight * 0.9) / height) * 10);
     }
-    scale = Math.min(ZOOM_RANGE[1], Math.max(scale, ZOOM_RANGE[0])); // clamp to range
     translateX = (window.innerWidth / 2) - (width / 2);
     translateY = (window.innerHeight / 2) - (height / 2);
-    cvs.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale/10})`;
+    updateTransform(translateX, translateY, scale);
     container.appendChild(cvs);
 
     let _ctx = cvs.getContext("2d");
     if (_ctx == null) throw new Error("The context for the canvas is not available");
     ctx = _ctx;
 
-    const socket = io(WS_URL);
+    socket = io(WS_URL);
 
     socket.on("connect", () => {
         console.log("Connected!");
@@ -141,6 +129,66 @@ function start() {
         console.log(`Received tile (x: ${x}, y: ${y})`);
         placeTile(x, y, color);
     });
+}
+
+function checkIfDragging() {
+    let diffX = pointer.x - pointer.startingX;
+    let diffY = pointer.y - pointer.startingY;
+
+    let distance = Math.abs( diffX**2 + diffY**2 );
+    if (distance >= DRAG_RANGE)
+        startDragging();
+}
+
+function startDragging() {
+    pointer.startingX = pointer.x;
+    pointer.startingY = pointer.y;
+    isDragging = true;
+}
+
+function updateDragging() {
+    let diffX = pointer.x - pointer.startingX;
+    let diffY = pointer.y - pointer.startingY;
+    updateTransform(translateX + diffX, translateY + diffY, scale);
+}
+
+function stopDragging() {
+    translateX += pointer.x - pointer.startingX;
+    translateY += pointer.y - pointer.startingY;
+    isDragging = false;
+}
+
+function updateScale(_scale: number) {
+    scale = Math.min(ZOOM_RANGE[1], Math.max(_scale, ZOOM_RANGE[0])); // clamp to range
+}
+
+function updateTransform(x: number, y: number, scale: number) {
+    cvs.style.transform = `translate(${x}px, ${y}px) scale(${scale / 10})`;
+}
+
+function updatePointer(e: PointerEvent) {
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
+
+    if (e.type === "pointerdown" && !pointer.down) {
+        if (e.button !== 2) {
+            pointer.down = true;
+            pointer.startingX = pointer.x;
+            pointer.startingY = pointer.y;
+        }
+    }
+    else if (e.type === "pointerup" && pointer.down) {
+        pointer.down = false;
+    }
+}
+
+function pointerPlaceTile(e: PointerEvent) {
+    let x = Math.floor((e.offsetX - cvs.offsetLeft) / TILE_SIZE);
+    let y = Math.floor((e.offsetY - cvs.offsetTop) / TILE_SIZE);
+
+    placeTile(x, y);
+    socket.emit("place-tile", [x, y, selectedColor]);
+    console.log(`Placed tile (x: ${x}, y: ${y})`);
 }
 
 function placeTile(x: number, y: number, color?: number) {
