@@ -26,6 +26,8 @@ let ctx: CanvasRenderingContext2D;
 let socket: Socket<DefaultEventsMap, DefaultEventsMap>;
 let selectedColor: number;
 let pointers: Pointer[] = [];
+let canDrag = false;
+let wasZoomed = false;
 let isDragging = false;
 let isZooming = false;
 let translateX = 0;
@@ -70,14 +72,24 @@ function start() {
     container.onpointermove = (e) => {
         updatePointer(e);
 
-        if (pointers.length === 1) { // Drag
-            if (isZooming)
-                stopZooming();
-            if (!isDragging)
-                startDragging();
+        if (pointers.length === 1) {
+            if (canDrag) { // Drag
+                if (isZooming)
+                    stopZooming();
+                if (!isDragging)
+                    startDragging();
 
-            updateDragValues();
-            updateTransform(translateX + translateDiffX, translateY + translateDiffY, scale);
+                updateDragValues();
+                updateTransform(translateX + translateDiffX, translateY + translateDiffY, scale);
+            }
+            else {
+                updateDragValues();
+
+                let distance = Math.abs(translateDiffX ** 2 + translateDiffY ** 2);
+                if (distance >= DRAG_RANGE)
+                    canDrag = true;
+            }
+
         }
         else if (pointers.length === 2) { // Zoom
             if (isDragging)
@@ -87,15 +99,23 @@ function start() {
 
             updateZoomValues();
             updateTransform(translateX, translateY, getClampedScale(scale * zoomDiff));
+            wasZoomed = true;
         }
     };
     container.onpointerup = (e) => {
         updatePointer(e);
 
-        if (isDragging && pointers.length === 1)
-            stopDragging();
-        else if (isZooming && pointers.length === 2)
+        if (pointers.length === 1) {
+            if (isDragging)
+                stopDragging();
+            else if (!canDrag && !wasZoomed)
+                pointerPlaceTile(e);
+            canDrag = false;
+            wasZoomed = false;
+        }
+        else if (pointers.length === 2 && isZooming) {
             stopZooming();
+        }
 
         removePointer(e);
     };
@@ -156,14 +176,12 @@ function startDragging() {
     isDragging = true;
     pointers[0].startingX = pointers[0].x;
     pointers[0].startingY = pointers[0].y;
-    console.log("start dragging");
 }
 
 function stopDragging() {
     translateX += translateDiffX;
     translateY += translateDiffY;
     isDragging = false;
-    console.log("stop dragging");
 }
 
 function updateDragValues() {
@@ -177,13 +195,11 @@ function startZooming() {
         (pointers[0].x - pointers[1].x)**2 +
         (pointers[0].y - pointers[1].y)**2
     );
-    console.log("start zooming");
 }
 
 function stopZooming() {
-    isZooming = false;
     scale = getClampedScale(scale * zoomDiff);
-    console.log("stop zooming");
+    isZooming = false;
 }
 
 function updateZoomValues() {
