@@ -15,11 +15,9 @@ const WS_PORT = 3000;
 const WS_URL = `ws://${location.hostname}:${WS_PORT}`;
 const CONTAINER_ELEM_ID = "container";
 const COLORS = [ "#fff", "#999", "#666", "#333", "#000", "#840", "#f00", "#f80", "#ff0", "#0f0", "#00f", "#f0f" ];
-const ROWS = 80;
-const COLS = 100;
 const TILE_SIZE = 10;
 const DRAG_RANGE = 300;
-const ZOOM_RANGE = [2, 30];
+const ZOOM_RANGE = [0.1, 3];
 
 let cvs: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D;
@@ -36,11 +34,13 @@ let translateDiffX = 0;
 let translateDiffY = 0;
 let zoomStartingDistance = 0;
 let zoomDiff = 0;
-let scale = 10;
+let scale = 1;
+let width = 0;
+let height = 0;
+let numOfRows = 0;
+let numOfCols = 0;
 
 function start() {
-    let width = COLS * TILE_SIZE;
-    let height = ROWS * TILE_SIZE;
     let buttonElems: HTMLButtonElement[] = [];
 
     for (let i = 0; i < COLORS.length; i++) {
@@ -133,17 +133,6 @@ function start() {
     cvs.style.position = "absolute";
     cvs.style.display = "block";
     cvs.style.boxShadow = "0 0 20px #003";
-    if (width > height) {
-        if (width > window.innerWidth * 0.9)
-            scale = getClampedScale(Math.floor((window.innerWidth * 0.9) / width) * 10);
-    }
-    else {
-        if (height > window.innerHeight * 0.9)
-            scale = getClampedScale(Math.floor((window.innerHeight * 0.9) / height) * 10);
-    }
-    translateX = (window.innerWidth / 2) - (width / 2);
-    translateY = (window.innerHeight / 2) - (height / 2);
-    updateTransform(translateX, translateY, scale);
     container.appendChild(cvs);
 
     let _ctx = cvs.getContext("2d");
@@ -156,15 +145,31 @@ function start() {
         console.log("Connected!");
     });
 
-    socket.on("all-tiles", (tiles) => {
-        console.log(`Received ${tiles.length} tiles!`);
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(0, 0, cvs.width, cvs.height)
-        for (let tile of tiles) {
-            let pos = tile[0].split(',')
+    socket.on("current-state", (state) => {
+        console.log(`Received ${state.tiles.length} tiles!`);
+
+        numOfRows = state.num_of_rows;
+        numOfCols = state.num_of_cols;
+        width = numOfCols * TILE_SIZE;
+        height = numOfRows * TILE_SIZE;
+        cvs.width = width;
+        cvs.height = height;
+        if (width > height) {
+            if (width > window.innerWidth * 0.9)
+                scale = getClampedScale(Math.floor((window.innerWidth * 0.9) / width));
+        }
+        else {
+            if (height > window.innerHeight * 0.9)
+                scale = getClampedScale(Math.floor((window.innerHeight * 0.9) / height));
+        }
+        translateX = (window.innerWidth / 2) - (width / 2);
+        translateY = (window.innerHeight / 2) - (height / 2);
+        updateTransform(translateX, translateY, scale);
+        for (let tile of state.tiles) {
+            let pos = tile[0].split(',');
             placeTile(pos[0], pos[1], tile[1]);
         }
-    })
+    });
 
     socket.on("new-tile", (data) => {
         let [x, y, color] = data;
@@ -216,7 +221,7 @@ function getClampedScale(_scale: number) {
 }
 
 function updateTransform(x: number, y: number, scale: number) {
-    cvs.style.transform = `translate(${x}px, ${y}px) scale(${scale / 10})`;
+    cvs.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
 }
 
 function updatePointer(e: PointerEvent) {
