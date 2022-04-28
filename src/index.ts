@@ -122,7 +122,7 @@ function start() {
     container.addEventListener("wheel", (e) => {
         e.preventDefault();
 
-        scale = getClampedScale(scale - e.deltaY / 50);
+        scale = getClampedScale(scale - e.deltaY / 500);
         updateTransform(translateX, translateY, scale);
     }, { passive: false });
 
